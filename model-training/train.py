@@ -179,7 +179,7 @@ def main():
     # Confusion Matrix Plot
     plt.figure(figsize=(14, 12))
     sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, fmt='d', cmap='Blues', xticklabels=classes, yticklabels=classes)
-    plt.title('Confusion Matrix - Evaluasi Skripsi')
+    plt.title('Confusion Matrix')
     plt.savefig(os.path.join(PLOTS_DIR, 'confusion_matrix.png'))
     TerminalUI.success("Visualisasi dan Tabel CSV berhasil disimpan.")
 

@@ -48,6 +48,39 @@ Pastikan Anda sudah menginstal **Node.js**.
 
 ---
 
+## 📸 Tool Pengumpul Data (Data Collector)
+
+Gunakan tool ini untuk mengambil foto dataset tangan Anda sendiri dengan mudah dan cepat.
+
+1.  **Masuk ke folder training:**
+    ```bash
+    cd model-training
+    ```
+
+2.  **Setup Environment (Jika belum):**
+    ```bash
+    python -m venv venv
+    # Windows:
+    .\venv\Scripts\activate
+    # Mac/Linux:
+    source venv/bin/activate
+    
+    pip install -r requirements.txt
+    ```
+
+3.  **Jalankan Tool:**
+    ```bash
+    python data_collector.py
+    ```
+
+4.  **Cara Penggunaan:**
+    *   **Pilih Kelas**: Masukkan nomor sesuai daftar (misal `1` untuk Alif). Folder akan dibuat otomatis jika belum ada.
+    *   **Posisikan Tangan**: Masukkan tangan ke dalam kotak hijau di layar.
+    *   **Rekam**: Tahan tombol **[S]** di keyboard untuk menyimpan foto secara beruntun (*burst mode*).
+    *   **Selesai**: Tekan **[Q]** untuk kembali ke menu utama.
+
+---
+
 ## 🧠 Cara Melatih Ulang Model
 
 1.  **Siapkan Dataset**: Simpan gambar di `model-training/dataset/` (minimal 100 gambar per huruf disarankan).
