@@ -1,6 +1,10 @@
 # Dataset
 model-training/dataset/
 
+# Output Model
+model-training/output_model/error_analysis/
+model-training/output_model/logs/
+
 # Python
 __pycache__/
 *.py[cod]

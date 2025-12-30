@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as tf from '@tensorflow/tfjs';
+import { log } from '@/lib/logger';
 
 export function useModel() {
   const [model, setModel] = useState<tf.GraphModel | tf.LayersModel | null>(null);
@@ -8,16 +9,21 @@ export function useModel() {
 
   useEffect(() => {
     async function loadModel() {
+      const startTime = performance.now();
       try {
         setIsLoading(true);
-        // Mencoba memuat model dari folder public
-        // Catatan: GraphModel untuk model SavedModel/TFHub yang dikonversi, 
-        // LayersModel untuk model H5 yang dikonversi (menggunakan model.json)
+        log.model("Mulai mengunduh file model.json...");
+        
         const loadedModel = await tf.loadLayersModel('/model/model.json');
+        
+        const endTime = performance.now();
+        const loadTime = ((endTime - startTime) / 1000).toFixed(2);
+        
         setModel(loadedModel);
-        console.log("Model berhasil dimuat");
+        log.model(`Model MobileNetV2 berhasil dimuat dalam ${loadTime} detik`);
+        log.system(`Backend TF.js: ${tf.getBackend()}`);
       } catch (err) {
-        console.error("Gagal memuat model", err);
+        log.error("Gagal memuat model klasifikasi", err);
         setError(err as Error);
       } finally {
         setIsLoading(false);

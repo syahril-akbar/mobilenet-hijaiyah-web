@@ -1,282 +1,225 @@
 import os
 import glob
+import shutil
+import subprocess
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import tensorflow as tf
+from datetime import datetime
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.utils import class_weight
 from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Input, Dropout
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
-import shutil
-import subprocess
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
+
+# --- Utilitas UI Terminal Pro ---
+class TerminalUI:
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
+    DIVIDER = "═" * 70
+
+    @staticmethod
+    def step(num, title):
+        print(f"\n{TerminalUI.BOLD}[ STEP {num} : {title.upper()} ]{TerminalUI.RESET}")
+        print(TerminalUI.DIVIDER)
+
+    @staticmethod
+    def sub_info(label, value):
+        print(f"  ├─ {label:<25} : {value}")
+
+    @staticmethod
+    def status(msg, type="info"):
+        labels = {"info": "[INFO]", "success": "[OK]", "ai": "[AI]", "error": "[ERROR]"}
+        print(f"  ├─ {labels.get(type, '[LOG]'):<25} : {msg}")
+
+    @staticmethod
+    def success(msg):
+        print(f"  └─ SUCCESS: {msg}")
 
 # --- Konfigurasi ---
 DATASET_DIR = os.path.join(os.path.dirname(__file__), 'dataset')
 OUTPUT_MODEL_DIR = os.path.join(os.path.dirname(__file__), 'output_model')
+REPORTS_DIR = os.path.join(OUTPUT_MODEL_DIR, 'reports')
+PLOTS_DIR = os.path.join(OUTPUT_MODEL_DIR, 'plots')
+LOG_DIR = os.path.join(OUTPUT_MODEL_DIR, 'logs', datetime.now().strftime("%Y%m%d-%H%M%S"))
 IMG_SIZE = (224, 224)
 BATCH_SIZE = 32
-EPOCHS = 50  # Batas maksimal epoch sesuai skripsi
-LEARNING_RATE = 0.001
 SEED = 42
 
-# Memastikan hasil dapat direproduksi
+os.makedirs(REPORTS_DIR, exist_ok=True)
+os.makedirs(PLOTS_DIR, exist_ok=True)
 tf.random.set_seed(SEED)
 np.random.seed(SEED)
 
-# Membuat direktori output jika belum ada
-os.makedirs(OUTPUT_MODEL_DIR, exist_ok=True)
-os.makedirs(os.path.join(OUTPUT_MODEL_DIR, 'plots'), exist_ok=True)
-
-def load_data_paths(dataset_dir):
-    """
-    Memuat path gambar dan label dari direktori dataset.
-    Asumsi struktur: dataset_dir/nama_kelas/file_gambar
-    """
-    file_paths = []
-    labels = []
-    classes = sorted([d for d in os.listdir(dataset_dir) if os.path.isdir(os.path.join(dataset_dir, d))])
+def main():
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print(f"{TerminalUI.BOLD}PIPELINE PELATIHAN MODEL{TerminalUI.RESET}")
     
-    class_to_idx = {cls_name: idx for idx, cls_name in enumerate(classes)}
-    idx_to_class = {idx: cls_name for cls_name, idx in class_to_idx.items()}
-    
-    print(f"[INFO] Menemukan {len(classes)} kelas: {classes}")
+    # --- FLOWCHART STEP 1: START ---
+    TerminalUI.step(1, "START (Inisialisasi Sistem)")
+    TerminalUI.sub_info("Waktu Mulai", datetime.now().strftime("%H:%M:%S"))
+    TerminalUI.sub_info("TensorFlow Version", tf.__version__)
+    TerminalUI.sub_info("GPU Tersedia", "Ya" if tf.config.list_physical_devices('GPU') else "Tidak (Menggunakan CPU)")
 
-    for cls_name in classes:
-        cls_dir = os.path.join(dataset_dir, cls_name)
-        # Mendukung ekstensi gambar umum
+    # --- FLOWCHART STEP 2: PENGUMPULAN DATASET ---
+    TerminalUI.step(2, "PENGUMPULAN DATASET (28 Huruf Hijaiyah)")
+    classes = sorted([d for d in os.listdir(DATASET_DIR) if os.path.isdir(os.path.join(DATASET_DIR, d))])
+    file_paths, labels = [], []
+    class_stats = []
+
+    for cls in classes:
+        cls_dir = os.path.join(DATASET_DIR, cls)
+        count = 0
         for ext in ['*.jpg', '*.jpeg', '*.png', '*.bmp']:
             cls_files = glob.glob(os.path.join(cls_dir, ext))
-            for file_path in cls_files:
-                file_paths.append(file_path)
-                labels.append(class_to_idx[cls_name])
-                
-    return np.array(file_paths), np.array(labels), classes, idx_to_class
+            for f in cls_files:
+                file_paths.append(f)
+                labels.append(classes.index(cls))
+                count += 1
+        class_stats.append((cls, count))
+    
+    TerminalUI.sub_info("Total Kelas", len(classes))
+    TerminalUI.sub_info("Total Sampel Gambar", len(file_paths))
+    TerminalUI.sub_info("Rata-rata Gambar/Kelas", round(len(file_paths)/len(classes), 1))
+    TerminalUI.success("Dataset berhasil diindeks.")
 
-def build_augmenter():
-    """
-    Membuat model augmentasi data menggunakan layer preprocessing Keras.
-    Teknik: Rotasi, Flip, Zoom, Kecerahan.
-    """
-    data_augmentation = tf.keras.Sequential([
-        tf.keras.layers.RandomRotation(0.15), # sekitar 15 derajat
+    # --- FLOWCHART STEP 3: PREPROCESSING ---
+    TerminalUI.step(3, "PREPROCESSING (Resize & Normalisasi)")
+    TerminalUI.sub_info("Target Dimensi", f"{IMG_SIZE[0]}x{IMG_SIZE[1]} piksel")
+    TerminalUI.sub_info("Metode Normalisasi", "Min-Max 0-1 (img / 255.0)")
+    
+    def process(path, label):
+        img = tf.io.read_file(path)
+        img = tf.image.decode_jpeg(img, channels=3)
+        img = tf.image.resize(img, IMG_SIZE)
+        return tf.cast(img, tf.float32) / 255.0, label
+
+    # --- FLOWCHART STEP 4: AUGMENTASI DATA ---
+    TerminalUI.step(4, "AUGMENTASI DATA (On-the-fly)")
+    TerminalUI.sub_info("Parameter Rotasi", "±15 Derajat")
+    TerminalUI.sub_info("Parameter Zoom", "0.8x - 1.2x")
+    TerminalUI.sub_info("Fitur Tambahan", "Horizontal Flip & Brightness Shift")
+    
+    augmenter = tf.keras.Sequential([
+        tf.keras.layers.RandomRotation(15/360),
         tf.keras.layers.RandomFlip("horizontal"),
-        tf.keras.layers.RandomZoom(0.2), 
+        tf.keras.layers.RandomZoom(0.2),
         tf.keras.layers.RandomBrightness(0.2),
-        tf.keras.layers.RandomContrast(0.2),
     ], name="data_augmentation")
-    return data_augmentation
 
-def preprocess_image(file_path, label):
-    """
-    Memuat dan memproses satu gambar.
-    """
-    img = tf.io.read_file(file_path)
-    img = tf.image.decode_jpeg(img, channels=3) 
-    img = tf.image.resize(img, IMG_SIZE)
+    # --- FLOWCHART STEP 5: SPLIT DATASET ---
+    TerminalUI.step(5, "SPLIT DATASET (Train/Val/Test)")
+    X_train, X_temp, y_train, y_temp = train_test_split(file_paths, labels, test_size=0.3, stratify=labels, random_state=SEED)
+    X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, stratify=y_temp, random_state=SEED)
     
-    # Preprocessing spesifik MobileNetV2 (konversi 0-255 ke rentang -1 hingga 1)
-    img = preprocess_input(img) 
-    
-    return img, label
+    TerminalUI.sub_info("Training Set (70%)", f"{len(X_train)} sampel")
+    TerminalUI.sub_info("Validation Set (15%)", f"{len(X_val)} sampel")
+    TerminalUI.sub_info("Test Set (15%)", f"{len(X_test)} sampel")
 
-def create_dataset(file_paths, labels, is_training=False):
-    """
-    Membuat tf.data.Dataset dari path file dan label.
-    """
-    ds = tf.data.Dataset.from_tensor_slices((file_paths, labels))
-    
-    # Memuat dan memproses gambar secara paralel
-    ds = ds.map(preprocess_image, num_parallel_calls=tf.data.AUTOTUNE)
-    
-    if is_training:
-        ds = ds.shuffle(buffer_size=len(file_paths))
-    
-    ds = ds.batch(BATCH_SIZE)
-    ds = ds.prefetch(buffer_size=tf.data.AUTOTUNE)
-    return ds
+    train_ds = tf.data.Dataset.from_tensor_slices((X_train, y_train)).map(process).shuffle(500).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+    val_ds = tf.data.Dataset.from_tensor_slices((X_val, y_val)).map(process).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+    test_ds = tf.data.Dataset.from_tensor_slices((X_test, y_test)).map(process).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
 
-def build_model(num_classes, augmentation_layer):
-    """
-    Membangun model MobileNetV2 dengan skema Transfer Learning.
-    """
-    # Model Dasar (Base Model)
-    base_model = MobileNetV2(
-        weights='imagenet',
-        include_top=False,
-        input_shape=(IMG_SIZE[0], IMG_SIZE[1], 3)
-    )
+    # --- FLOWCHART STEP 6: LOAD MOBILENETV2 (Transfer Learning) ---
+    TerminalUI.step(6, "LOAD MOBILENETV2 (Pre-trained ImageNet)")
+    base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+    base_model.trainable = False
     
-    base_model.trainable = False # Membekukan layer dasar diawal
-
-    inputs = Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3))
-    
-    # Terapkan augmentasi (aktif hanya saat fase training)
-    x = augmentation_layer(inputs)
-    
-    # Lewatkan ke model dasar
-    x = base_model(x, training=False) # BatchNormalization tetap dalam mode inferensi
-    
-    # Bagian Atas (Head Model)
+    inputs = Input(shape=(224, 224, 3))
+    x = augmenter(inputs)
+    x = base_model(x, training=False)
     x = GlobalAveragePooling2D()(x)
-    x = Dropout(0.2)(x) # Regulasi untuk mencegah overfitting
-    outputs = Dense(num_classes, activation='softmax')(x)
-    
+    x = Dropout(0.3)(x)
+    outputs = Dense(len(classes), activation='softmax')(x)
     model = Model(inputs, outputs)
-    return model, base_model
+    
+    TerminalUI.sub_info("Total Layer", len(model.layers))
+    TerminalUI.sub_info("Trainable Params", f"{model.count_params():,}")
+    TerminalUI.success("Model arsitektur siap.")
 
-def plot_history(history, save_path):
-    """Visualisasi riwayat akurasi dan loss training."""
-    acc = history.history['accuracy']
-    val_acc = history.history['val_accuracy']
-    loss = history.history['loss']
-    val_loss = history.history['val_loss']
-    epochs_range = range(len(acc))
+    # --- FLOWCHART STEP 7: TRAINING MODEL (Fine-tuning) ---
+    TerminalUI.step(7, "TRAINING MODEL (Fase 1: Warmup)")
+    model.compile(optimizer=Adam(1e-3), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    
+    weights = class_weight.compute_class_weight('balanced', classes=np.unique(labels), y=labels)
+    class_weight_dict = dict(enumerate(weights))
 
-    plt.figure(figsize=(12, 6))
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs_range, acc, label='Akurasi Training')
-    plt.plot(epochs_range, val_acc, label='Akurasi Validasi')
-    plt.legend(loc='lower right')
-    plt.title('Akurasi Training dan Validasi')
+    history = model.fit(train_ds, validation_data=val_ds, epochs=15, verbose=1, class_weight=class_weight_dict)
 
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs_range, loss, label='Loss Training')
-    plt.plot(epochs_range, val_loss, label='Loss Validasi')
-    plt.legend(loc='upper right')
-    plt.title('Loss Training dan Validasi')
-    plt.savefig(save_path)
-    plt.close()
+    # --- FLOWCHART STEP 8 & 9: DECISION & TUNING ---
+    TerminalUI.step(8, "DECISION & TUNING (Fine-Tuning Tahap 2)")
+    TerminalUI.sub_info("Unfreeze MobileNetV2", "Layer 100 s/d 154")
+    base_model.trainable = True
+    for layer in base_model.layers[:100]: layer.trainable = False
+    
+    model.compile(optimizer=Adam(1e-5), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    TerminalUI.status("Melakukan Fine-tuning untuk akurasi maksimal...", "ai")
+    model.fit(train_ds, validation_data=val_ds, epochs=25, verbose=1, class_weight=class_weight_dict)
 
-def plot_confusion_matrix(y_true, y_pred, classes, save_path):
-    """Visualisasi Confusion Matrix menggunakan Seaborn."""
-    cm = confusion_matrix(y_true, y_pred)
-    plt.figure(figsize=(15, 15))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=classes, yticklabels=classes)
-    plt.ylabel('Aktual')
-    plt.xlabel('Prediksi')
-    plt.title('Confusion Matrix')
-    plt.tight_layout()
-    plt.savefig(save_path)
-    plt.close()
+    # --- FLOWCHART STEP 10: EVALUASI MODEL ---
+    TerminalUI.step(10, "EVALUASI MODEL (Accuracy & Metrics)")
+    loss, accuracy = model.evaluate(test_ds, verbose=0)
+    
+    TerminalUI.sub_info("Akurasi Akhir", f"{accuracy*100:.2f}%")
+    
+    # Generate Reports
+    y_pred = np.argmax(model.predict(test_ds, verbose=0), axis=1)
+    report = classification_report(y_test, y_pred, target_names=classes)
+    print(f"\n{report}")
+    
+    # Save CSV
+    report_dict = classification_report(y_test, y_pred, target_names=classes, output_dict=True)
+    pd.DataFrame(report_dict).transpose().to_csv(os.path.join(REPORTS_DIR, 'performa_final.csv'))
+    
+    # Confusion Matrix Plot
+    plt.figure(figsize=(14, 12))
+    sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, fmt='d', cmap='Blues', xticklabels=classes, yticklabels=classes)
+    plt.title('Confusion Matrix - Evaluasi Skripsi')
+    plt.savefig(os.path.join(PLOTS_DIR, 'confusion_matrix.png'))
+    TerminalUI.success("Visualisasi dan Tabel CSV berhasil disimpan.")
 
-def main():
-    print("--- 1. Pengumpulan & Pembagian Data ---")
-    file_paths, labels, classes, idx_to_class = load_data_paths(DATASET_DIR)
-    num_classes = len(classes)
+    # --- FLOWCHART STEP 11: SIMPAN MODEL ---
+    TerminalUI.step(11, "SIMPAN MODEL (.h5)")
+    save_path = os.path.join(OUTPUT_MODEL_DIR, 'mobilenet_hijaiyah.h5')
     
-    if len(file_paths) == 0:
-        print("[ERROR] Tidak ada gambar ditemukan! Pastikan folder dataset terisi.")
-        return
+    # Ekstraksi model bersih untuk inferensi
+    inf_inputs = Input(shape=(224, 224, 3))
+    x_inf = model.layers[2](inf_inputs, training=False)
+    for i in range(3, len(model.layers)): x_inf = model.layers[i](x_inf)
+    Model(inputs=inf_inputs, outputs=x_inf).save(save_path)
+    
+    TerminalUI.sub_info("Path File", save_path)
+    TerminalUI.success("Model .h5 tersimpan di direktori output.")
 
-    # Split: Train (70%), Temp (30%)
-    X_train, X_temp, y_train, y_temp = train_test_split(
-        file_paths, labels, test_size=0.3, stratify=labels, random_state=SEED
-    )
-    
-    # Split Temp: Val (15% total), Test (15% total)
-    X_val, X_test, y_val, y_test = train_test_split(
-        X_temp, y_temp, test_size=0.5, stratify=y_temp, random_state=SEED
-    )
-    
-    print(f"Sampel Train: {len(X_train)}")
-    print(f"Sampel Val:   {len(X_val)}")
-    print(f"Sampel Test:  {len(X_test)}")
-    
-    # Membuat Dataset TF
-    train_ds = create_dataset(X_train, y_train, is_training=True)
-    val_ds = create_dataset(X_val, y_val)
-    test_ds = create_dataset(X_test, y_test)
-    
-    print("\n--- 2. Membangun Model (MobileNetV2 Transfer Learning) ---")
-    augmenter = build_augmenter()
-    model, base_model = build_model(num_classes, augmenter)
-    
-    model.compile(
-        optimizer=Adam(learning_rate=LEARNING_RATE),
-        loss='sparse_categorical_crossentropy',
-        metrics=['accuracy']
-    )
-    
-    model.summary()
-    
-    print("\n--- 3. Proses Training ---")
-    # Callbacks (Pengontrol Training)
-    early_stopping = EarlyStopping(monitor='val_accuracy', patience=10, restore_best_weights=True, verbose=1)
-    reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=1e-6, verbose=1)
-    checkpoint_path = os.path.join(OUTPUT_MODEL_DIR, 'best_model.keras')
-    model_checkpoint = ModelCheckpoint(checkpoint_path, monitor='val_accuracy', save_best_only=True, verbose=1)
-    
-    history = model.fit(
-        train_ds,
-        validation_data=val_ds,
-        epochs=EPOCHS,
-        callbacks=[early_stopping, reduce_lr, model_checkpoint]
-    )
-    
-    # Plot riwayat
-    plot_history(history, os.path.join(OUTPUT_MODEL_DIR, 'plots', 'training_history.png'))
-    
-    print("\n--- 4. Evaluasi Model ---")
-    loss, accuracy = model.evaluate(test_ds)
-    print(f"Akurasi Test: {accuracy*100:.2f}%")
-    
-    # Laporan Detail
-    y_pred_probs = model.predict(test_ds)
-    y_pred = np.argmax(y_pred_probs, axis=1)
-    
-    print(classification_report(y_test, y_pred, target_names=classes))
-    
-    plot_confusion_matrix(y_test, y_pred, classes, os.path.join(OUTPUT_MODEL_DIR, 'plots', 'confusion_matrix.png'))
-    
-    print("\n--- 5. Penyimpanan & Konversi ---")
-    # Simpan model penuh
-    save_path_h5_full = os.path.join(OUTPUT_MODEL_DIR, 'mobilenet_hijaiyah_full.h5')
-    model.save(save_path_h5_full)
-    print(f"Model lengkap disimpan di: {save_path_h5_full}")
-
-    # Buat Model Inferensi (Hapus layer augmentasi agar kompatibel dengan TF.js)
-    print("Mengekstrak model inferensi (menghapus layer augmentasi)...")
-    inference_inputs = Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3))
-    
-    # Identifikasi layer MobileNetV2
-    base_layer = [l for l in model.layers if 'mobilenet' in l.name.lower()][0]
-    print(f"Layer dasar terpilih: {base_layer.name}")
-    
-    x = base_layer(inference_inputs, training=False)
-    
-    # Tambahkan sisa layer (Pooling, Dropout, Dense)
-    base_index = model.layers.index(base_layer)
-    for layer in model.layers[base_index+1:]:
-        print(f"Menambahkan layer: {layer.name}")
-        x = layer(x)
-        
-    inference_model = Model(inputs=inference_inputs, outputs=x)
-    inference_model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-
-    save_path_inference = os.path.join(OUTPUT_MODEL_DIR, 'mobilenet_hijaiyah.h5')
-    inference_model.save(save_path_inference)
-    print(f"Model inferensi disimpan di: {save_path_inference}")
-    
-    # Konversi ke TensorFlow.js
-    tfjs_target_dir = os.path.join(OUTPUT_MODEL_DIR, 'tfjs_model')
+    # --- FLOWCHART STEP 12: KONVERSI KE TENSORFLOW.JS ---
+    TerminalUI.step(12, "KONVERSI KE TENSORFLOW.JS (model.json)")
     try:
-        command = [
-            "tensorflowjs_converter",
-            "--input_format=keras",
-            save_path_inference,
-            tfjs_target_dir
-        ]
-        print(f"Menjalankan konversi: {' '.join(command)}")
-        subprocess.run(command, check=True, shell=True)
-        print(f"Model TFJS disimpan di: {tfjs_target_dir}")
+        tfjs_dir = os.path.join(OUTPUT_MODEL_DIR, 'tfjs_model')
+        if os.path.exists(tfjs_dir): shutil.rmtree(tfjs_dir)
+        subprocess.run(["tensorflowjs_converter", "--input_format=keras", save_path, tfjs_dir], check=True, shell=True)
+        TerminalUI.success("Konversi ke format web selesai.")
+        
+        # Sinkronisasi ke Web App
+        print("\n" + "═" * 70)
+        pilihan = input(f"{TerminalUI.BOLD}SINKRONISASI: Salin model ke Web App? (y/n): {TerminalUI.RESET}").lower()
+        if pilihan == 'y':
+            web_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'web-app', 'public', 'model')
+            if os.path.exists(web_dir): shutil.rmtree(web_dir)
+            shutil.copytree(tfjs_dir, web_dir)
+            TerminalUI.status("Web App berhasil disinkronisasi.", "success")
     except Exception as e:
-        print(f"[WARNING] Gagal konversi otomatis. Error: {e}")
+        print(f"[ERROR] Gagal konversi: {e}")
+
+    # --- FLOWCHART STEP 13: END ---
+    TerminalUI.step(13, "END (Selesai)")
+    TerminalUI.sub_info("Status Akhir", "Selesai Tanpa Hambatan")
+    TerminalUI.sub_info("Waktu Selesai", datetime.now().strftime("%H:%M:%S"))
+    print(f"\n{TerminalUI.BOLD}>>> SELURUH TAHAPAN FLOWCHART TELAH TERLAKSANA <<<{TerminalUI.RESET}\n")
 
 if __name__ == '__main__':
     main()

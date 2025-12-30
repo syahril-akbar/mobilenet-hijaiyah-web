@@ -5,6 +5,7 @@ import { useModel } from '@/hooks/use-model';
 import { useWebcam } from '@/hooks/use-webcam';
 import { HIJAIYAH_CLASSES, HIJAIYAH_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { log } from '@/lib/logger';
 import { Camera, AlertCircle, Activity, Play, Square, Hand, CheckCircle2, Scan, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,9 +29,12 @@ export default function Classifier() {
     async function initDetector() {
       try {
         setIsDetectorLoading(true);
+        log.system("Membangun FilesetResolver MediaPipe...");
         const vision = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
         );
+        
+        log.system("Memuat model hand_landmarker.task...");
         const landmarker = await HandLandmarker.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
@@ -39,10 +43,11 @@ export default function Classifier() {
           runningMode: "VIDEO",
           numHands: 1
         });
+        
         setHandLandmarker(landmarker);
-        console.log("Sistem Deteksi Tangan Siap");
+        log.system("Sistem Pelacakan Tangan Siap");
       } catch (err) {
-        console.error("Gagal menginisialisasi deteksi tangan", err);
+        log.error("Gagal menginisialisasi deteksi tangan", err);
       } finally {
         setIsDetectorLoading(false);
       }
@@ -134,11 +139,13 @@ export default function Classifier() {
           
           if (maxScore >= threshold) {
             const classKey = HIJAIYAH_CLASSES[maxIdx];
+            const label = HIJAIYAH_LABELS[classKey] || classKey;
             setPrediction({
-              label: HIJAIYAH_LABELS[classKey] || classKey,
+              label: label,
               confidence: maxScore
             });
             setStatusMessage("Tangan Terdeteksi");
+            log.detection(label, maxScore);
           } else {
             setPrediction(null);
             setStatusMessage("Confidence Rendah");
@@ -151,7 +158,7 @@ export default function Classifier() {
         setStatusMessage("Objek Tidak Terdeteksi");
       }
     } catch (err) {
-      console.error("Error pada loop prediksi:", err);
+      log.error("Kesalahan pada loop prediksi", err);
     }
     
     // Ulangi proses pada frame berikutnya (Loop Real-time)
@@ -163,9 +170,13 @@ export default function Classifier() {
   // Manajemen siklus hidup loop deteksi
   useEffect(() => {
     if (isInferencing && classificationModel && handLandmarker && isVideoReady) {
+      log.system("Loop inferensi dimulai");
       requestRef.current = requestAnimationFrame(predict);
     } else {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      if (requestRef.current) {
+        log.system("Loop inferensi dihentikan");
+        cancelAnimationFrame(requestRef.current);
+      }
       setPrediction(null);
       setHandBox(null);
       setStatusMessage("Menunggu gestur...");
