@@ -1,0 +1,82 @@
+'use client';
+
+import Classifier from '@/components/classifier';
+import { Card } from '@/components/ui/card';
+import { Github, Info, BookOpen, Play, Activity, ShieldCheck } from 'lucide-react';
+
+export default function Home() {
+  return (
+    <main className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-50 via-slate-50 to-emerald-100/20">
+      {/* Navigasi / Header - Bagian atas halaman */}
+      <nav className="w-full border-b bg-white/50 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold">
+              H
+            </div>
+            <span className="font-bold text-xl tracking-tight text-emerald-900">HijaiyahAI</span>
+          </div>
+          <div className="flex items-center space-x-4 text-sm font-medium text-emerald-800">
+            <a href="#" className="hover:text-primary transition-colors flex items-center">
+              <BookOpen className="w-4 h-4 mr-1" /> Panduan
+            </a>
+            <a href="#" className="hover:text-primary transition-colors flex items-center">
+              <Info className="w-4 h-4 mr-1" /> Tentang
+            </a>
+          </div>
+        </div>
+      </nav>
+
+      <div className="max-w-6xl mx-auto py-12 px-4 space-y-12">
+        {/* Hero Section - Judul dan deskripsi singkat aplikasi */}
+        <section className="text-center space-y-6 max-w-3xl mx-auto">
+          <div className="inline-block px-4 py-1.5 mb-2 rounded-full bg-emerald-100 text-emerald-700 text-sm font-semibold tracking-wide uppercase animate-in fade-in slide-in-from-bottom-2 duration-700">
+            Sistem Pembelajaran Cerdas
+          </div>
+          <h1 className="text-5xl md:text-6xl font-black text-slate-900 tracking-tighter leading-[1.1]">
+            Klasifikasi Huruf <span className="text-primary italic underline decoration-emerald-200 underline-offset-8">Hijaiyah</span>
+          </h1>
+          <p className="text-xl text-slate-600 leading-relaxed font-medium">
+            Sistem pengenalan gestur tangan real-time berbasis <span className="text-emerald-700 font-bold">MobileNetV2</span>. 
+            Belajar bahasa isyarat Arab dengan teknologi AI masa kini.
+          </p>
+        </section>
+
+        {/* Classifier Container - Wadah utama untuk sistem deteksi kamera */}
+        <section className="relative group">
+          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-[2rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+          <Card className="relative bg-white/80 backdrop-blur-xl rounded-[1.8rem] shadow-2xl overflow-hidden border-emerald-100/50 p-2 md:p-4">
+             <Classifier />
+          </Card>
+        </section>
+
+        {/* Sorotan Fitur - Keunggulan sistem aplikasi */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { title: "Deteksi Real-time", desc: "Proses klasifikasi instan langsung di browser Anda menggunakan WebGL.", icon: <Play className="w-5 h-5" /> },
+            { title: "Privasi Terjamin", desc: "Semua pemrosesan data kamera dilakukan secara lokal di perangkat Anda.", icon: <ShieldCheck className="w-5 h-5" /> },
+            { title: "Arsitektur MobileNetV2", desc: "Menggunakan model yang ringan dan efisien untuk performa maksimal.", icon: <Activity className="w-5 h-5" /> }
+          ].map((f, i) => (
+            <Card key={i} className="p-6 border-emerald-50 bg-white/50 hover:bg-white transition-colors duration-300">
+              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-4">
+                {f.icon}
+              </div>
+              <h3 className="font-bold text-lg text-emerald-900 mb-2">{f.title}</h3>
+              <p className="text-slate-500 text-sm leading-relaxed">{f.desc}</p>
+            </Card>
+          ))}
+        </section>
+
+        {/* Footer - Hak cipta dan tautan eksternal */}
+        <footer className="pt-12 border-t border-emerald-100 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="text-slate-400 text-sm font-medium text-center md:text-left">
+            © 2025 Program Studi Informatika - Universitas Muhammadiyah Makassar
+          </div>
+          <div className="flex space-x-6 text-slate-400">
+            <a href="#" className="hover:text-primary transition-colors"><Github className="w-5 h-5" /></a>
+          </div>
+        </footer>
+      </div>
+    </main>
+  );
+}

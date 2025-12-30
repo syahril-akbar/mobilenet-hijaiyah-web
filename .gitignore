@@ -1,0 +1,21 @@
+# Dataset
+model-training/dataset/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# OS
+.DS_Store
+Thumbs.db
+
+# informasi lainnya
+Flowchart Proses Training Model.png
+Flowchart Sistem Aplikasi Web.png
+Skripsi Asli.pdf
