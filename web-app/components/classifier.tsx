@@ -59,11 +59,16 @@ export default function Classifier() {
   const predict = useCallback(async () => {
     if (!classificationModel || !handLandmarker || !videoRef.current || !isVideoReady) return;
 
-    // Pastikan video sedang berjalan
-    if (videoRef.current.readyState < 2) return;
+    // Pastikan video sedang berjalan dan memiliki dimensi yang valid
+    const video = videoRef.current;
+    if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
+       if (isInferencing) {
+          requestRef.current = requestAnimationFrame(predict);
+       }
+       return;
+    }
 
     try {
-      const video = videoRef.current!;
       const startTimeMs = performance.now();
       
       // 1. Deteksi posisi tangan menggunakan landmark
@@ -157,13 +162,16 @@ export default function Classifier() {
         setPrediction(null);
         setStatusMessage("Objek Tidak Terdeteksi");
       }
+      
+      // Ulangi proses pada frame berikutnya (Loop Real-time) hanya jika tidak ada error
+      if (isInferencing) {
+        requestRef.current = requestAnimationFrame(predict);
+      }
+
     } catch (err) {
       log.error("Kesalahan pada loop prediksi", err);
-    }
-    
-    // Ulangi proses pada frame berikutnya (Loop Real-time)
-    if (isInferencing) {
-        requestRef.current = requestAnimationFrame(predict);
+      setIsInferencing(false); // Hentikan loop jika terjadi error fatal
+      setStatusMessage("Error Sistem: Deteksi Dihentikan");
     }
   }, [classificationModel, handLandmarker, isVideoReady, isInferencing, videoRef]);
 
