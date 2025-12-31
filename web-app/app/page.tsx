@@ -5,13 +5,12 @@ import { Card } from '@/components/ui/card';
 import { Github, Info, BookOpen, Play, Activity, ShieldCheck, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-50 via-slate-50 to-emerald-100/20">
+    <main className="min-h-screen bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-emerald-50 via-slate-50 to-emerald-100/20">
       {/* Navigasi / Header - Bagian atas halaman */}
       <nav className="w-full border-b bg-white/50 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -128,7 +127,7 @@ export default function Home() {
 
         {/* Classifier Container - Wadah utama untuk sistem deteksi kamera */}
         <section className="relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-[2rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+          <div className="absolute -inset-1 bg-linear-to-r from-emerald-400 to-teal-400 rounded-[2rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
           <Card className="relative bg-white/80 backdrop-blur-xl rounded-[1.8rem] shadow-2xl overflow-hidden border-emerald-100/50 p-2 md:p-4">
              <Classifier />
           </Card>

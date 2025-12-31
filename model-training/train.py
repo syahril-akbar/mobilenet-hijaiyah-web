@@ -11,11 +11,11 @@ from datetime import datetime
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn.utils import class_weight
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Input, Dropout
-from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
+from keras.applications import MobileNetV2
+from keras.layers import Dense, GlobalAveragePooling2D, Input, Dropout
+from keras.models import Model
+from keras.optimizers import Adam
+from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 
 # --- Utilitas UI Terminal Pro ---
 class TerminalUI:
