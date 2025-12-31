@@ -11,8 +11,9 @@ from datetime import datetime
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn.utils import class_weight
+# Menggunakan import langsung dari keras untuk menghindari masalah kompatibilitas IDE
 from keras.applications import MobileNetV2
-from keras.layers import Dense, GlobalAveragePooling2D, Input, Dropout
+from keras.layers import Dense, GlobalAveragePooling2D, Input, Dropout, RandomRotation, RandomFlip, RandomZoom, RandomBrightness, RandomContrast, RandomTranslation
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
@@ -63,30 +64,60 @@ def main():
     # --- FLOWCHART STEP 1: START ---
     TerminalUI.step(1, "START (Inisialisasi Sistem)")
     TerminalUI.sub_info("Waktu Mulai", datetime.now().strftime("%H:%M:%S"))
-    TerminalUI.sub_info("TensorFlow Version", tf.__version__)
+    TerminalUI.sub_info("Versi TensorFlow", tf.__version__)
     TerminalUI.sub_info("GPU Tersedia", "Ya" if tf.config.list_physical_devices('GPU') else "Tidak (Menggunakan CPU)")
 
-    # --- FLOWCHART STEP 2: PENGUMPULAN DATASET ---
+    # --- FLOWCHART STEP 2: PENGUMPULAN & PENYEIMBANGAN DATASET ---
     TerminalUI.step(2, "PENGUMPULAN DATASET (28 Huruf Hijaiyah)")
     classes = sorted([d for d in os.listdir(DATASET_DIR) if os.path.isdir(os.path.join(DATASET_DIR, d))])
-    file_paths, labels = [], []
-    class_stats = []
-
+    
+    # Menyiapkan wadah untuk jalur file per kelas
+    class_file_map = {}
+    total_files_awal = 0
+    
+    # Membaca semua file gambar
     for cls in classes:
         cls_dir = os.path.join(DATASET_DIR, cls)
-        count = 0
+        cls_files = []
         for ext in ['*.jpg', '*.jpeg', '*.png', '*.bmp']:
-            cls_files = glob.glob(os.path.join(cls_dir, ext))
-            for f in cls_files:
-                file_paths.append(f)
-                labels.append(classes.index(cls))
-                count += 1
-        class_stats.append((cls, count))
-    
+            cls_files.extend(glob.glob(os.path.join(cls_dir, ext)))
+        class_file_map[cls] = cls_files
+        total_files_awal += len(cls_files)
+
     TerminalUI.sub_info("Total Kelas", len(classes))
-    TerminalUI.sub_info("Total Sampel Gambar", len(file_paths))
-    TerminalUI.sub_info("Rata-rata Gambar/Kelas", round(len(file_paths)/len(classes), 1))
-    TerminalUI.success("Dataset berhasil diindeks.")
+    TerminalUI.sub_info("Total Data Awal", total_files_awal)
+
+    # --- PROSES OVERSAMPLING ---
+    # Mencari jumlah sampel terbanyak dalam satu kelas
+    max_samples = max(len(files) for files in class_file_map.values())
+    TerminalUI.status(f"Target sampel per kelas: {max_samples}", "ai")
+    TerminalUI.status("Menyeimbangkan dataset (Oversampling)...", "ai")
+
+    balanced_file_paths = []
+    balanced_labels = []
+
+    for cls in classes:
+        files = class_file_map[cls]
+        n_files = len(files)
+        
+        # Jika data kurang dari target, lakukan duplikasi acak
+        if n_files < max_samples and n_files > 0:
+            # Ambil semua file asli
+            selected_files = files
+            # Hitung kekurangan
+            n_shortage = max_samples - n_files
+            # Ambil acak dari file yang ada untuk menutupi kekurangan
+            duplicated_files = np.random.choice(files, size=n_shortage, replace=True)
+            # Gabungkan
+            final_files = np.concatenate([selected_files, duplicated_files])
+        else:
+            final_files = files[:max_samples] # Potong jika berlebih (opsional, saat ini ambil max)
+
+        balanced_file_paths.extend(final_files)
+        balanced_labels.extend([classes.index(cls)] * len(final_files))
+
+    TerminalUI.sub_info("Total Data Akhir", len(balanced_file_paths))
+    TerminalUI.success("Dataset berhasil diindeks dan diseimbangkan.")
 
     # --- FLOWCHART STEP 3: PREPROCESSING ---
     TerminalUI.step(3, "PREPROCESSING (Resize & Normalisasi)")
@@ -101,52 +132,58 @@ def main():
 
     # --- FLOWCHART STEP 4: AUGMENTASI DATA ---
     TerminalUI.step(4, "AUGMENTASI DATA (On-the-fly)")
-    TerminalUI.sub_info("Parameter Rotasi", "±15 Derajat")
-    TerminalUI.sub_info("Parameter Zoom", "0.8x - 1.2x")
-    TerminalUI.sub_info("Fitur Tambahan", "Horizontal Flip & Brightness Shift")
+    TerminalUI.sub_info("Parameter Rotasi", "±20 Derajat")
+    TerminalUI.sub_info("Parameter Zoom", "0.7x - 1.3x")
+    TerminalUI.sub_info("Fitur Tambahan", "Flip, Kecerahan, Kontras, Geser")
     
+    # Augmentasi diperkuat karena kita menggunakan Oversampling (banyak data duplikat)
     augmenter = tf.keras.Sequential([
-        tf.keras.layers.RandomRotation(15/360),
-        tf.keras.layers.RandomFlip("horizontal"),
-        tf.keras.layers.RandomZoom(0.2),
-        tf.keras.layers.RandomBrightness(0.2),
+        RandomRotation(20/360),       # Rotasi hingga 20 derajat
+        RandomFlip("horizontal"),     # Membalik gambar horizontal
+        RandomZoom(0.3),              # Zoom in/out hingga 30%
+        RandomBrightness(0.2),        # Variasi kecerahan
+        RandomContrast(0.2),          # Variasi kontras
+        RandomTranslation(0.1, 0.1),  # Geser posisi gambar
     ], name="data_augmentation")
 
     # --- FLOWCHART STEP 5: SPLIT DATASET ---
     TerminalUI.step(5, "SPLIT DATASET (Train/Val/Test)")
-    X_train, X_temp, y_train, y_temp = train_test_split(file_paths, labels, test_size=0.3, stratify=labels, random_state=SEED)
+    # Menggunakan data yang sudah diseimbangkan (balanced)
+    X_train, X_temp, y_train, y_temp = train_test_split(balanced_file_paths, balanced_labels, test_size=0.3, stratify=balanced_labels, random_state=SEED)
     X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, stratify=y_temp, random_state=SEED)
     
     TerminalUI.sub_info("Training Set (70%)", f"{len(X_train)} sampel")
     TerminalUI.sub_info("Validation Set (15%)", f"{len(X_val)} sampel")
     TerminalUI.sub_info("Test Set (15%)", f"{len(X_test)} sampel")
 
-    train_ds = tf.data.Dataset.from_tensor_slices((X_train, y_train)).map(process).shuffle(500).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+    # Membuat objek Dataset TensorFlow
+    train_ds = tf.data.Dataset.from_tensor_slices((X_train, y_train)).map(process).shuffle(1000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
     val_ds = tf.data.Dataset.from_tensor_slices((X_val, y_val)).map(process).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
     test_ds = tf.data.Dataset.from_tensor_slices((X_test, y_test)).map(process).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
 
     # --- FLOWCHART STEP 6: LOAD MOBILENETV2 (Transfer Learning) ---
     TerminalUI.step(6, "LOAD MOBILENETV2 (Pre-trained ImageNet)")
     base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
-    base_model.trainable = False
+    base_model.trainable = False # Bekukan bobot awal
     
     inputs = Input(shape=(224, 224, 3))
     x = augmenter(inputs)
     x = base_model(x, training=False)
     x = GlobalAveragePooling2D()(x)
-    x = Dropout(0.3)(x)
+    x = Dropout(0.4)(x) # Dropout ditingkatkan ke 40% untuk mencegah overfitting data duplikat
     outputs = Dense(len(classes), activation='softmax')(x)
     model = Model(inputs, outputs)
     
     TerminalUI.sub_info("Total Layer", len(model.layers))
-    TerminalUI.sub_info("Trainable Params", f"{model.count_params():,}")
+    TerminalUI.sub_info("Parameter Dapat Dilatih", f"{model.count_params():,}")
     TerminalUI.success("Model arsitektur siap.")
 
-    # --- FLOWCHART STEP 7: TRAINING MODEL (Fine-tuning) ---
+    # --- FLOWCHART STEP 7: TRAINING MODEL (Fase 1: Warmup) ---
     TerminalUI.step(7, "TRAINING MODEL (Fase 1: Warmup)")
     model.compile(optimizer=Adam(1e-3), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     
-    weights = class_weight.compute_class_weight('balanced', classes=np.unique(labels), y=labels)
+    # Menghitung bobot kelas (opsional karena sudah oversampling, tapi tetap baik untuk keamanan)
+    weights = class_weight.compute_class_weight('balanced', classes=np.unique(balanced_labels), y=balanced_labels)
     class_weight_dict = dict(enumerate(weights))
 
     history = model.fit(train_ds, validation_data=val_ds, epochs=15, verbose=1, class_weight=class_weight_dict)
@@ -155,8 +192,10 @@ def main():
     TerminalUI.step(8, "DECISION & TUNING (Fine-Tuning Tahap 2)")
     TerminalUI.sub_info("Unfreeze MobileNetV2", "Layer 100 s/d 154")
     base_model.trainable = True
+    # Bekukan 100 layer pertama, latih sisanya
     for layer in base_model.layers[:100]: layer.trainable = False
     
+    # Gunakan learning rate yang sangat kecil untuk fine-tuning
     model.compile(optimizer=Adam(1e-5), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     TerminalUI.status("Melakukan Fine-tuning untuk akurasi maksimal...", "ai")
     model.fit(train_ds, validation_data=val_ds, epochs=25, verbose=1, class_weight=class_weight_dict)
@@ -167,16 +206,16 @@ def main():
     
     TerminalUI.sub_info("Akurasi Akhir", f"{accuracy*100:.2f}%")
     
-    # Generate Reports
+    # Generate Laporan Klasifikasi
     y_pred = np.argmax(model.predict(test_ds, verbose=0), axis=1)
     report = classification_report(y_test, y_pred, target_names=classes)
     print(f"\n{report}")
     
-    # Save CSV
+    # Simpan Laporan CSV
     report_dict = classification_report(y_test, y_pred, target_names=classes, output_dict=True)
     pd.DataFrame(report_dict).transpose().to_csv(os.path.join(REPORTS_DIR, 'performa_final.csv'))
     
-    # Confusion Matrix Plot
+    # Plot Confusion Matrix
     plt.figure(figsize=(14, 12))
     sns.heatmap(confusion_matrix(y_test, y_pred), annot=True, fmt='d', cmap='Blues', xticklabels=classes, yticklabels=classes)
     plt.title('Confusion Matrix')
@@ -187,8 +226,10 @@ def main():
     TerminalUI.step(11, "SIMPAN MODEL (.h5)")
     save_path = os.path.join(OUTPUT_MODEL_DIR, 'mobilenet_hijaiyah.h5')
     
-    # Ekstraksi model bersih untuk inferensi
+    # Ekstraksi model bersih untuk inferensi (tanpa layer augmentasi)
     inf_inputs = Input(shape=(224, 224, 3))
+    # Mengambil output dari base_model (layer indeks ke-2 dst)
+    # Layer 0: Input, Layer 1: Augmentasi (dilewati), Layer 2: MobileNetV2
     x_inf = model.layers[2](inf_inputs, training=False)
     for i in range(3, len(model.layers)): x_inf = model.layers[i](x_inf)
     Model(inputs=inf_inputs, outputs=x_inf).save(save_path)

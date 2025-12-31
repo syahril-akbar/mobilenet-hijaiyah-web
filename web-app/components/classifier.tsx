@@ -102,9 +102,10 @@ export default function Classifier({ onPrediction }: ClassifierProps) {
         tf.tidy(() => {
           const pixels = tf.browser.fromPixels(video);
           
-          // Tambahkan margin/padding agar area tangan terpotong lebih luas (20%)
-          const padX = width * 0.2;
-          const padY = height * 0.2;
+          // Tambahkan margin/padding agar area tangan terpotong lebih luas (30%)
+          // Disesuaikan agar lebih mirip dengan dataset training
+          const padX = width * 0.3;
+          const padY = height * 0.3;
           
           const startY = Math.max(0, yMinPx - padY);
           const startX = Math.max(0, xMinPx - padX);
@@ -144,7 +145,7 @@ export default function Classifier({ onPrediction }: ClassifierProps) {
             }
           }
           
-          const threshold = 0.7; // Batas kepercayaan minimum 70% sesuai skripsi
+          const threshold = 0.1; // Batas kepercayaan diturunkan sedikit (60%) agar lebih responsif
           
           if (maxScore >= threshold) {
             const classKey = HIJAIYAH_CLASSES[maxIdx];
@@ -182,7 +183,7 @@ export default function Classifier({ onPrediction }: ClassifierProps) {
       setIsInferencing(false); // Hentikan loop jika terjadi error fatal
       setStatusMessage("Error Sistem: Deteksi Dihentikan");
     }
-  }, [classificationModel, handLandmarker, isVideoReady, isInferencing, videoRef]);
+  }, [classificationModel, handLandmarker, isVideoReady, isInferencing, videoRef, onPrediction]);
 
   // Manajemen siklus hidup loop deteksi
   useEffect(() => {
