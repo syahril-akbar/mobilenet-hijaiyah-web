@@ -12,7 +12,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-export default function Classifier() {
+interface ClassifierProps {
+  onPrediction?: (label: string, confidence: number) => void;
+}
+
+export default function Classifier({ onPrediction }: ClassifierProps) {
   const { model: classificationModel, isLoading: isModelLoading, error: modelError } = useModel();
   const { videoRef, startWebcam, isVideoReady, onVideoLoaded, error: camError } = useWebcam();
   
@@ -122,8 +126,8 @@ export default function Classifier() {
               [224, 224]
           );
           
-          // Normalisasi piksel ke rentang [-1, 1] sesuai kebutuhan MobileNetV2
-          img = img.div(127.5).sub(1);
+          // Normalisasi piksel ke rentang [0, 1]
+          img = img.div(255.0);
           
           // Jalankan inferensi menggunakan model MobileNetV2 yang sudah dilatih
           const predictions = classificationModel.predict(img) as tf.Tensor;
@@ -151,6 +155,11 @@ export default function Classifier() {
             });
             setStatusMessage("Tangan Terdeteksi");
             log.detection(label, maxScore);
+
+            // Kirim hasil ke komponen induk jika ada callback
+            if (onPrediction) {
+              onPrediction(label, maxScore);
+            }
           } else {
             setPrediction(null);
             setStatusMessage("Confidence Rendah");

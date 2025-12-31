@@ -1,113 +1,93 @@
-# Deteksi Bahasa Isyarat Hijaiyah Berbasis Web (MobileNetV2)
+# HijaiyahAI - Sistem Pembelajaran Bahasa Isyarat Cerdas
 
-Proyek ini adalah aplikasi web real-time untuk mendeteksi isyarat tangan huruf Hijaiyah menggunakan kamera. Aplikasi ini telah dilengkapi dengan teknologi **Auto Hand Tracking** dan sistem pelaporan otomatis.
+![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)
+![TensorFlow.js](https://img.shields.io/badge/AI-TensorFlow.js-orange?style=for-the-badge&logo=tensorflow)
+![MobileNetV2](https://img.shields.io/badge/Model-MobileNetV2-blue?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Stable-emerald?style=for-the-badge)
 
-## ✨ Fitur Utama
-
-- **Auto Hand Tracking**: Menggunakan **MediaPipe Tasks Vision** untuk mendeteksi dan melacak posisi tangan secara otomatis (tidak perlu menyesuaikan tangan ke bingkai statis).
-- **Dynamic ROI**: Area pemotongan (*crop*) gambar mengikuti pergerakan tangan pengguna secara real-time.
-- **Klasifikasi MobileNetV2**: Model AI yang ringan dan dioptimalkan untuk perangkat web.
-- **Terminal UI Pro (Training)**: Antarmuka terminal yang futuristik untuk memantau setiap tahapan *flowchart* pelatihan model secara detail.
-- **Thesis Report Generator**: Otomatis menghasilkan narasi laporan, tabel performa CSV, dan analisis kesalahan klasifikasi.
-- **UI Modern**: Dibangun dengan **Next.js**, **Tailwind CSS**, dan **Shadcn UI** dengan tema Emerald yang segar.
-- **Real-time Console Bridge**: Log sistem dari browser dikirim secara langsung ke terminal pengembang secara real-time.
-- **Privasi Penuh**: Seluruh pemrosesan dilakukan di sisi klien (browser), tidak ada data video yang dikirim ke server.
+Aplikasi web modern untuk belajar dan mengenali isyarat tangan huruf Hijaiyah secara real-time. Menggabungkan teknologi *Computer Vision* dengan pengalaman belajar yang interaktif dan menyenangkan.
 
 ---
 
-## 📂 Struktur Folder
+## ✨ Fitur Unggulan
 
-- **`web-app/`**: Frontend (Next.js + TypeScript).
-- **`model-training/`**: Backend (Python) untuk melatih dan mengonversi model.
-- **`model-training/output_model/reports/`**: Hasil analisis otomatis.
-- **`model-training/output_model/plots/`**: Grafik distribusi data dan Confusion Matrix.
+### 🧠 Inti Kecerdasan Buatan
+- **Klasifikasi Real-time:** Deteksi instan 28 huruf Hijaiyah menggunakan model **MobileNetV2** yang ringan dan efisien.
+- **Auto Hand Tracking:** Integrasi **MediaPipe** untuk melacak posisi tangan secara presisi, memungkinkan deteksi yang akurat dalam berbagai kondisi posisi.
+- **On-Device Inference:** Seluruh proses AI berjalan langsung di browser pengguna menggunakan akselerasi GPU (WebGL), menjamin kecepatan tinggi dan privasi data.
 
----
+### 🎮 Pengalaman Belajar Interaktif
+- **Kamus Isyarat (Panduan):** Katalog visual lengkap sebagai referensi bentuk tangan untuk setiap huruf Hijaiyah.
+- **Mode Latihan (Kuis):** Sistem tantangan interaktif untuk menguji kemampuan isyarat pengguna.
+    - **Verifikasi Instan:** Feedback langsung apakah gestur yang diperagakan sudah benar.
+    - **Umpan Balik Audio:** Narasi suara setiap huruf dan efek suara keberhasilan.
+    - **Gamifikasi:** Efek visual perayaan (Confetti) saat berhasil menjawab tantangan.
+    - **Overlay Referensi:** Bantuan visual langsung di layar kamera untuk mempermudah pemula.
 
-## 🚀 Cara Menjalankan Aplikasi Web
-
-Pastikan Anda sudah menginstal **Node.js**.
-
-1.  **Masuk ke folder web-app:**
-    ```bash
-    cd web-app
-    ```
-
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
-
-3.  **Jalankan server:**
-    ```bash
-    npm run dev
-    ```
-
-4.  **Akses Browser:**
-    Buka [http://localhost:3000](http://localhost:3000) dan izinkan akses kamera. Pantau log real-time di terminal Anda.
+### 📊 Dashboard Personal
+- **Log Riwayat:** Mencatat setiap keberhasilan latihan secara otomatis.
+- **Statistik Belajar:** Pantau jumlah huruf yang telah dikuasai dan aktivitas harian.
+- **Local Storage:** Data progres tersimpan secara lokal di perangkat Anda.
 
 ---
 
-## 📸 Tool Pengumpul Data (Data Collector)
+## 📂 Struktur Proyek
 
-Gunakan tool ini untuk mengambil foto dataset tangan Anda sendiri dengan mudah dan cepat.
-
-1.  **Masuk ke folder training:**
-    ```bash
-    cd model-training
-    ```
-
-2.  **Setup Environment (Jika belum):**
-    ```bash
-    python -m venv venv
-    # Windows:
-    .\venv\Scripts\activate
-    # Mac/Linux:
-    source venv/bin/activate
-    
-    pip install -r requirements.txt
-    ```
-
-3.  **Jalankan Tool:**
-    ```bash
-    python data_collector.py
-    ```
-
-4.  **Cara Penggunaan:**
-    *   **Pilih Kelas**: Masukkan nomor sesuai daftar (misal `1` untuk Alif). Folder akan dibuat otomatis jika belum ada.
-    *   **Posisikan Tangan**: Masukkan tangan ke dalam kotak hijau di layar.
-    *   **Rekam**: Tahan tombol **[S]** di keyboard untuk menyimpan foto secara beruntun (*burst mode*).
-    *   **Selesai**: Tekan **[Q]** untuk kembali ke menu utama.
+```bash
+├── web-app/                # Aplikasi Web (Next.js + TypeScript)
+│   ├── app/                # Arsitektur Halaman (Home, Latihan, Panduan, Profil)
+│   ├── components/         # Komponen UI Reusable
+│   ├── hooks/              # Logika Bisnis & Pengelola State
+│   └── public/             # Aset Statis (Model, Gambar, Suara)
+│
+├── model-training/         # Pipeline Pelatihan AI (Python)
+│   ├── dataset/            # Data Latih (28 Kelas Huruf)
+│   ├── train.py            # Skrip Pelatihan MobileNetV2
+│   ├── data_collector.py   # Alat Pengumpul Dataset Mandiri
+│   └── sync_assets.py      # Automasi Sinkronisasi Aset ke Web
+```
 
 ---
 
-## 🧠 Cara Melatih Ulang Model
+## 🚀 Cara Menjalankan
 
-1.  **Siapkan Dataset**: Simpan gambar di `model-training/dataset/` (minimal 100 gambar per huruf disarankan).
-2.  **Setup Python**:
-    ```bash
-    cd model-training
-    python -m venv venv
-    .\venv\Scripts\activate
-    pip install -r requirements.txt
-    ```
-3.  **Jalankan Training**:
-    ```bash
-    python train.py
-    ```
-    *Sistem akan menampilkan 13 tahapan alur pelatihan.*
+### Persiapan
+Pastikan sistem Anda sudah terinstal **Node.js** (v18+) dan **Python** (v3.9+).
 
-4.  **Otomatis Sinkronisasi**:
-    Setelah konversi selesai, ketik **'y'** pada dialog konfirmasi di terminal untuk memperbarui model di aplikasi web secara otomatis.
+### 1. Menjalankan Aplikasi Web
+```bash
+cd web-app
+npm install
+npm run dev
+```
+Akses aplikasi melalui: [http://localhost:3000](http://localhost:3000)
+
+### 2. Manajemen Model & Aset (Python)
+```bash
+cd model-training
+pip install -r requirements.txt
+
+# Mengumpulkan dataset baru
+python data_collector.py 
+
+# Melatih ulang model AI
+python train.py
+
+# Sinkronisasi otomatis gambar contoh ke aplikasi web
+python sync_assets.py
+```
 
 ---
 
-## 🛠️ Catatan Teknis & Metodologi
+## 🛠️ Teknologi yang Digunakan
 
-- **Normalisasi**: Menggunakan Min-Max Scaling (0-1).
-- **Augmentasi**: Rotasi 15°, Zoom 0.8-1.2x, dan translasi posisi.
-- **Ambang Batas (Threshold)**: Sistem disetel pada **0.7 (70%)**. Jika di bawah nilai ini, sistem menampilkan "Confidence Rendah".
-- **Hardware**: Disarankan menggunakan browser Chrome/Edge dengan akselerasi GPU aktif untuk performa tracking yang mulus.
-- **Editor**: Proyek ini menyertakan pengaturan `.vscode/settings.json` agar VS Code otomatis menggunakan Virtual Environment Python yang tepat.
+*   **Frontend:** Next.js 14, Tailwind CSS, Lucide Icons, Radix UI
+*   **Artificial Intelligence:** TensorFlow.js, MediaPipe Tasks Vision
+*   **Deep Learning Model:** MobileNetV2 (CNN)
+*   **Interaktivitas:** Web Speech API, Canvas Confetti
 
 ---
+
+## 📝 Lisensi
+© 2025 HijaiyahAI.
+Dibuat untuk memajukan pendidikan bahasa Arab berbasis teknologi.
