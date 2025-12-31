@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ClassifierProps {
-  onPrediction?: (label: string, confidence: number) => void;
+  onPrediction?: (label: string, confidence: number, classKey: string) => void;
 }
 
 export default function Classifier({ onPrediction }: ClassifierProps) {
@@ -145,7 +145,7 @@ export default function Classifier({ onPrediction }: ClassifierProps) {
             }
           }
           
-          const threshold = 0.1; // Batas kepercayaan diturunkan sedikit (60%) agar lebih responsif
+          const threshold = 0.1; // Batas kepercayaan minimum 
           
           if (maxScore >= threshold) {
             const classKey = HIJAIYAH_CLASSES[maxIdx];
@@ -159,7 +159,7 @@ export default function Classifier({ onPrediction }: ClassifierProps) {
 
             // Kirim hasil ke komponen induk jika ada callback
             if (onPrediction) {
-              onPrediction(label, maxScore);
+              onPrediction(label, maxScore, classKey);
             }
           } else {
             setPrediction(null);
