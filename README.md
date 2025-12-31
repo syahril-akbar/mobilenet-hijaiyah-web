@@ -63,9 +63,24 @@ npm run dev
 Akses aplikasi melalui: [http://localhost:3000](http://localhost:3000)
 
 ### 2. Manajemen Model & Aset (Python)
+Memerlukan **Python 3.9 atau lebih baru**. Disarankan menggunakan *virtual environment* untuk menjaga isolasi dependensi.
+
 ```bash
 cd model-training
+
+# Membuat virtual environment (.venv)
+python -m venv .venv
+
+# Aktivasi .venv (Windows)
+.\.venv\Scripts\activate
+
+# Aktivasi .venv (macOS/Linux)
+source .venv/bin/activate
+
+# Instalasi dependensi
 pip install -r requirements.txt
+
+# --- Perintah Manajemen ---
 
 # Mengumpulkan dataset baru
 python data_collector.py 
